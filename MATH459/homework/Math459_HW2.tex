@@ -1,0 +1,69 @@
+\documentclass[12pt]{article}
+
+\setlength{\evensidemargin}{-0.25 in}
+\setlength{\oddsidemargin}{-0.25 in} \setlength{\textwidth}{6.8 in}
+\setlength{\topmargin}{-0.5 in} \setlength{\textheight}{8.6 in}
+\setlength{\parindent}{0in}
+\setlength{\parskip}{\baselineskip}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm} 
+\usepackage{xy}
+\usepackage{verbatim}
+\usepackage[english]{babel}
+\usepackage{graphicx}
+\newtheorem{definition}{Definition}
+\usepackage{bbm}
+
+
+\begin{document}
+\vspace{-2cm}
+\begin{center}
+{\large \bf Math 459 HW2} \\
+{\it Due Thursday, Feb. 18} \\
+\end{center}
+
+\noindent
+\textbf{\underline{Guidelines:}}
+\begin{itemize}
+\item You must show your work to get credit.
+\item Include your \textbf{R} code and the output (just copy+paste into a text file).
+\end{itemize}
+
+
+\textbf{1.} Consider a random sample of size $n$ from a population having density
+\[
+f(x | \eta)= \frac{\eta}{x^{\eta+1}}, \;\;\; x \geq 1, \;\; \eta > 0 .
+\]
+We want to make inference about $\eta$. Assume a Gamma prior for $\eta$ with shape $\alpha$ and rate $\beta$, with density
+\[
+f(\eta | \alpha, \beta)=\frac{\beta^{\alpha}}{\Gamma(\alpha)}\eta^{\alpha-1}e^{-\beta \eta}, \;\;\;  \eta, \alpha, \beta > 0.
+\]
+\begin{description}
+\item[(a)] Derive the posterior density. 
+\item[(b)] Find the posterior mean and MLE of $\eta$.
+\item[(c)] Install the \texttt{VGAM} package and use the function \texttt{rpareto(n=100, scale=1, shape=1)} to generate a random sample of size 100. Using this generated data, construct a 95\% Bayesian equal-tailed credible interval for $\eta$, assuming the hyperparameters have values $\alpha=2$ and $\beta=0.5$. Do not use a package which does MCMC sampling (which we will learn about later).
+\item[(d)] Find a 95\% credible interval with length approximately 1, using these or any other hyperparameter values. This should give you some idea about how the use of strong prior assumptions can yield more precise credible intervals. Hint: You can change the hyperparameter values, and there is no need for the interval to be equal-tailed. Finding it by trial and error in \texttt{R} is fine (no proof is needed). You may find it helpful to plot the posterior to see where most of the mass lies. 
+\end{description}
+
+
+\bigskip
+\textbf{2.} Suppose that we are interested in finding a minimax estimator for the probability of success $\theta$ in a binomial population, where the parameters are $\theta$ and $n$, and $n$ is treated as fixed. This estimator is to be based on a single observation $Y \sim \text{Bin}(n, \theta)$, with fixed $n$. We will use a squared-error loss function. Recall that in lecture, we said that the risk of a point estimator of $\theta$ under squared error loss is often called the \textbf{mean squared error (MSE)} of the estimator. It turns out that if we can find a Bayes estimator with constant MSE, then that Bayes estimator will also be minimax. Finding all possible Bayes estimators would require us to consider many different classes of priors. Let's restrict ourselves to conjugate Beta priors for the binomial likelihood, where the Beta density has parameters $\alpha$ and $\beta$, both greater than zero.
+\begin{description}
+\item[(a)] Find the Bayes estimator for $\theta$ under squared error loss with the Beta prior.
+\item[(b)] Using the fact that a Bayes estimator with constant MSE is also a minimax estimator, find a minimax estimator of $\theta$.
+\end{description}
+
+
+\bigskip
+\textbf{3.} For both parts of this question, your responses should be \textbf{typed} and less than a half-page. Explain, \textbf{in your own words}, how a Bayesian would solve each problem, and how a frequentist would solve the same problem.  \begin{description}
+\item[(a)] The Sunrise Problem posed by Laplace:\\
+\url{https://en.wikipedia.org/wiki/Sunrise_problem}
+
+\item[(b)] The German Tank Problem posed during World War II:\\
+\url{https://en.wikipedia.org/wiki/German_tank_problem}
+
+\end{description}
+
+\end{document}

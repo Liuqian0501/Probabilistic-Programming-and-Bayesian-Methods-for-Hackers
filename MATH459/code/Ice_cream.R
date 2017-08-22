@@ -1,0 +1,428 @@
+# initiate date
+icecream <- data.frame(
+  temp = c(11.9,14.2,15.2,16.4,17.2,18.1,
+           18.5,19.4,22.1,22.6,23.4,25.1),
+  units=c(185L, 215L, 332L, 325L, 408L, 421L,
+          406L, 412L, 522L, 445L, 544L, 614L)
+);
+basicPlot <- function(...){
+  plot(units ~ temp, data=icecream, bty="n", lwd=2,
+       main="Number of ice creams sold", col="#00526D",
+       xlab="Temperature (Celsius)",
+       ylab="Units sold", ...)
+  axis(side = 1, col="grey")
+  axis(side = 2, col="grey")
+}
+basicPlot()
+
+# Gaussian fit
+
+lin.mod <- glm(units ~ temp, data=icecream,
+               family=gaussian(link="identity"))
+lin.sig <- summary(lin.mod)$dispersion
+lin.pred <- predict(lin.mod)
+
+library(arm) # for 'display' function only
+display(lin.mod)
+# Log-linear Fit
+log.lin.mod <- glm(log(units) ~ temp, data=icecream,
+                   family=gaussian(link="identity"))
+display(log.lin.mod)
+log.lin.sig <- summary(log.lin.mod)$dispersion
+log.lin.pred <- exp(predict(log.lin.mod) + 0.5*log.lin.sig)
+basicPlot()
+# plot line for Gaussian
+lines(icecream$temp, log.lin.pred, col="red", lwd=2)
+lines(icecream$temp, lin.pred, col="blue", lwd=2)
+legend(x="topleft", bty="n", lwd=c(2,2), lty=c(NA,1),
+       legend=c("observation", "log-transformed LM"),
+       col=c("#00526D","red"), pch=c(1,NA))
+
+
+
+
+# Poission fit
+
+pois.mod <- glm(units ~ temp, data=icecream,
+                family=poisson(link="log"))
+display(pois.mod)
+pois.pred <- predict(pois.mod, type="response")
+predict(pois.mod,newdata=data.frame(temp=32),
+        type="response")
+# Plot for poisson
+basicPlot()
+lines(icecream$temp, pois.pred, col="blue", lwd=2)
+legend(x="topleft", bty="n", lwd=c(2,2), lty=c(NA,1),
+       legend=c("observation", "Poisson (log) GLM"),
+       col=c("#00526D","blue"), pch=c(1,NA))
+
+
+
+# Binomial regression fit
+
+market.size <- 800
+icecream$opportunity <- market.size - icecream$units
+bin.glm <- glm(cbind(units, opportunity) ~ temp, data=icecream,
+               family=binomial(link = "logit"))
+display(bin.glm)
+# Plot Binomial fit
+bin.pred <- predict(bin.glm, type="response")*market.size
+basicPlot()
+lines(icecream$temp, bin.pred, col="purple", lwd=2)
+legend(x="topleft", bty="n", lwd=c(2,2), lty=c(NA,1),
+       legend=c("observation", "Binomial (logit) GLM"),
+       col=c("#00526D","purple"), pch=c(1,NA))
+# Sales at 0 Celsius
+plogis(coef(bin.glm)[1])*market.size
+# Sales at 35 Celsius
+plogis(coef(bin.glm)[1]+coef(bin.glm)[2]*35)*market.size
+
+
+
+## plot together
+
+temp <- 0:35
+p.lm <- predict(lin.mod, data.frame(temp=temp), type="response")
+p.log.lm <- exp(predict(log.lin.mod, data.frame(temp=0:35), type="response") +
+                  0.5 * summary(log.lin.mod)$dispersion)
+p.pois <- predict(pois.mod, data.frame(temp=temp), type="response")
+p.bin <- predict(bin.glm, data.frame(temp=temp), type="response")*market.size
+basicPlot(xlim=range(temp), ylim=c(-20,market.size))
+lines(temp, p.lm, type="l", col="orange", lwd=2)
+lines(temp, p.log.lm, type="l", col="red", lwd=2)
+lines(temp, p.pois, type="l", col="blue", lwd=2)
+lines(temp, p.bin, type="l", col="purple", lwd=2)
+legend(x="topleft",
+       legend=c("observation",
+                "linear model",
+                "log-transformed LM",
+                "Poisson (log) GLM",
+                "Binomial (logit) GLM"),
+       col=c("#00526D","orange", "red",
+             "blue", "purple"),
+       bty="n", lwd=rep(2,5),
+       lty=c(NA,rep(1,4)),
+       pch=c(1,rep(NA,4)))
+
+
+##Visualizing GLMs (function to produce 3d plots)
+  glmModelPlot <- function(x, y, xlim,ylim, meanPred, LwPred, UpPred,
+                           plotData, main=NULL){
+    ## Based on code by Arthur Charpentier:
+    ## http://freakonometrics.hypotheses.org/9593
+    par(mfrow=c(1,1))
+    n <- 2
+    N <- length(meanPred)
+    zMax <- max(unlist(sapply(plotData, "[[", "z")))*1.5
+    mat <- persp(xlim, ylim, matrix(0, n, n), main=main,
+                 zlim=c(0, zMax), theta=-30,
+                 ticktype="detailed",box=FALSE)
+    C <- trans3d(x, UpPred, rep(0, N),mat)
+    lines(C, lty=2)
+    C <- trans3d(x, LwPred, rep(0, N), mat)
+    lines(C, lty=2)
+    C <- trans3d(c(x, rev(x)), c(UpPred, rev(LwPred)),
+                 rep(0, 2*N), mat)
+    polygon(C, border=NA, col=adjustcolor("yellow", alpha.f = 0.5))
+    C <- trans3d(x, meanPred, rep(0, N), mat)
+    lines(C, lwd=2, col="grey")
+    C <- trans3d(x, y, rep(0,N), mat)
+    points(C, lwd=2, col="#00526D")
+    for(j in N:1){
+      xp <- plotData[[j]]$x
+      yp <- plotData[[j]]$y
+      z0 <- plotData[[j]]$z0
+      zp <- plotData[[j]]$z
+      C <- trans3d(c(xp, xp), c(yp, rev(yp)), c(zp, z0), mat)
+      polygon(C, border=NA, col="light blue", density=40)
+      C <- trans3d(xp, yp, z0, mat)
+      lines(C, lty=2)
+      C <- trans3d(xp, yp, zp, mat)
+      lines(C, col=adjustcolor("blue", alpha.f = 0.5))
+    }
+  }
+
+## 3D for "Linear regression"
+  xlim <- c(min(icecream$temp)*0.95, max(icecream$temp)*1.05)
+  ylim <- c(floor(min(icecream$units)*0.95),
+            ceiling(max(icecream$units)*1.05))
+    #lin.mod <- glm(units ~ temp, data=icecream,
+    #            family=gaussian(link="identity"))
+  par(mfrow=c(2,2))
+  plot(lin.mod)
+  title(outer=TRUE, line = -1,
+        main = list("Linear regression",
+                    cex=1.25,col="black", font=2))
+  meanPred <- predict(lin.mod, type="response")
+  sdgig <- sqrt(summary(lin.mod)$dispersion)
+  UpPred <- qnorm(.95, meanPred, sdgig)
+  LwPred <- qnorm(.05, meanPred, sdgig)
+  plotData <- lapply(
+    seq(along=icecream$temp),
+    function(i){
+      stp <- 251
+      x = rep(icecream$temp[i], stp)
+      y = seq(ylim[1], ylim[2], length=stp)
+      z0 = rep(0, stp)
+      z = dnorm(y, meanPred[i], sdgig)
+      return(list(x=x, y=y, z0=z0, z=z))
+    }
+  )
+  glmModelPlot(x = icecream$temp, y=icecream$units,
+               xlim=xlim, ylim=ylim,
+               meanPred = meanPred, LwPred = LwPred,
+               UpPred = UpPred, plotData = plotData,
+               main = "Linear regression")
+  
+  #### 3D for "log-Linear regression"
+  xlim <- c(min(icecream$temp)*0.95, max(icecream$temp)*1.05)
+  ylim <- c(floor(min(icecream$units)*0.95),
+            ceiling(max(icecream$units)*1.05))
+  #lin.mod <- glm(log(units) ~ temp, data=icecream,
+  #            family=gaussian(link="identity"))
+  par(mfrow=c(2,2))
+  plot(log.lin.mod)
+  plot(log.lin.mod)
+  title(outer=TRUE, line = -1,
+        main = list("log Linear regression",
+                    cex=1.25,col="black", font=2))
+  
+  meanPred <- log.lin.pred
+  sdgig <- sqrt(exp(mean(log.lin.sig*meanPred)));
+  UpPred <- qnorm(.95, meanPred, sdgig)
+  LwPred <- qnorm(.05, meanPred, sdgig)
+  plotData <- lapply(
+    seq(along=icecream$temp),
+    function(i){
+      stp <- 251
+      x = rep(icecream$temp[i], stp)
+      y = seq(ylim[1], ylim[2], length=stp)
+      z0 = rep(0, stp)
+      z = dnorm(y, meanPred[i], sdgig)
+      return(list(x=x, y=y, z0=z0, z=z))
+    }
+  )
+  glmModelPlot(x = icecream$temp, y=icecream$units,
+               xlim=xlim, ylim=ylim,
+               meanPred = meanPred, LwPred = LwPred,
+               UpPred = UpPred, plotData = plotData,
+               main = "log Linear regression")
+  
+  ## 3D for "poisson regression"
+  xlim <- c(min(icecream$temp)*0.95, max(icecream$temp)*1.05)
+  ylim <- c(floor(min(icecream$units)*0.95),
+            ceiling(max(icecream$units)*1.05))
+  #lin.mod <- glm(units ~ temp, data=icecream,
+  #            family=gaussian(link="identity"))
+  par(mfrow=c(2,2))
+  plot(pois.mod)
+  title(outer=TRUE, line = -1,
+        main = list("Linear regression",
+                    cex=1.25,col="black", font=2))
+  meanPred <- pois.pred
+  sdgig <- sqrt(summary(pois.mod)$dispersion)
+  UpPred <- qnorm(.95, meanPred, sdgig)
+  LwPred <- qnorm(.05, meanPred, sdgig)
+  plotData <- lapply(
+    seq(along=icecream$temp),
+    function(i){
+      stp <- 251
+      x = rep(icecream$temp[i], stp)
+      y = seq(ylim[1], ylim[2], length=stp)
+      z0 = rep(0, stp)
+      z = dnorm(y, meanPred[i], sdgig)
+      return(list(x=x, y=y, z0=z0, z=z))
+    }
+  )
+  glmModelPlot(x = icecream$temp, y=icecream$units,
+               xlim=xlim, ylim=ylim,
+               meanPred = meanPred, LwPred = LwPred,
+               UpPred = UpPred, plotData = plotData,
+               main = "Poisson regression")
+  
+  
+  
+  
+  ##log-transformed linear model
+  stanLogTransformed <-"
+data {
+  int N;
+  vector[N] units;
+  vector[N] temp;
+  }
+  transformed data {
+  vector[N] log_units;
+  log_units <- log(units);
+  }
+  parameters {
+  real alpha;
+  real beta;
+  real tau;
+  }
+  transformed parameters {
+  real sigma;
+  sigma <- 1.0 / sqrt(tau);
+  }
+  model{
+  // Model
+  log_units ~ normal(alpha + beta * temp, sigma);
+  // Priors
+  alpha ~ normal(0.0, 1000.0);
+  beta ~ normal(0.0, 1000.0);
+  tau ~ gamma(0.001, 0.001);
+  }
+  generated quantities{
+  vector[N] units_pred;
+  for(i in 1:N)
+  units_pred[i] <- exp(normal_rng(alpha + beta * temp[i], sigma));
+  }"
+  
+##Visualizing Posterior Predictive Distribution of
+# Log-Transformed Model using rstan
+  temp <- c(11.9,14.2,15.2,16.4,17.2,18.1,18.5,19.4,22.1,22.6,23.4,25.1)
+  units <- c(185L,215L,332L,325L,408L,421L,406L,412L,522L,445L,544L, 614L)
+  library(rstan)
+  stanmodel <- stan_model(model_code = stanLogTransformed)
+  fit <- sampling(stanmodel,
+                  data = list(N=length(units),
+                              units=units,
+                              temp=temp),
+                  iter = 1000, warmup=200)
+  ## Extract generated posterior predictive quantities
+  Sims <- data.frame(stanoutput[["units_pred"]])
+  ## Calculate summary statistics
+  SummarySims <- apply(Sims, 2, summary)
+  colnames(SummarySims) <- paste(icecream$temp,"??C")
+  ## Extract estimated parameters
+  (parms <- sapply(stanoutput[c("alpha", "beta", "sigma")], mean))
+  
+  
+  
+  ##We use brms package to create prediction intervals for the four
+  #GLM models
+  temp <- c(11.9,14.2,15.2,16.4,17.2,18.1,18.5,19.4,22.1,22.6,23.4,25.1)
+  units <- c(185L,215L,332L,325L,408L,421L,406L,412L,522L,445L,544L, 614L)
+  library(brms)
+  # Linear model
+  lin.brm.mod <- brm(units ~ temp, family="gaussian")
+  # Log-transformed LM
+  log.brm.mod <- brm(log(units) ~ temp, family="gaussian")
+  # Poisson (log)
+  pois.brm.mod <- brm(units ~ temp, data=icecream,
+                  family=poisson(link="log"))
+  #Binomial (logit)
+  bin.brm.mod <- brm(units ~ temp, data=icecream,
+                 family=binomial(link = "logit"))
+  summary(lin.brm.mod)
+  summary(log.brm.mod)
+  summary(pois.brm.mod)
+  summary(bin.brm.mod)
+  
+
+  # plot posterior distribution
+  plot(lin.brm.mod)
+  plot(log.brm.mod)
+  plot(pois.brm.mod)
+  plot(bin.brm.mod)
+  
+  plot(marginal_effects(lin.brm.mod))
+  plot(marginal_effects(log.brm.mod))
+  plot(marginal_effects(pois.brm.mod))
+  plot(marginal_effects(bin.brm.mod))
+  
+  
+  ##Combine prediction credible intervals in data frame (for
+  #single plot)
+  n = 4;
+ modelData <- data.frame(
+    Model=factor(c(rep("Linear model", n),
+                   rep("Log-transformed LM", n),
+                   rep("Poisson (log)",n),
+                   rep("Binomial (logit)",n)),
+                 levels=c("Linear model",
+                          "Log-transformed LM",
+                          "Poisson (log)",
+                          "Binomial (logit)"),
+                 ordered = TRUE),
+    Temperature=rep(temp, 4),
+    Units_sold=rep(units, 4),
+    rbind(predict(lin.brm.mod),
+          exp(predict(log.brm.mod) +
+                0.5 * mean(extract(log.brm.mod$fit)[["sigma_units"]])),
+          predict(pois.brm.mod),
+          predict(bin.brm.mod)
+    )
+  )
+  
+  # creating plot
+  library(lattice)
+  key <- list(
+    rep=FALSE,
+    lines=list(col=c("#00526D", "blue"), type=c("p","l"), pch=1),
+    text=list(lab=c("Observation","Estimate")),
+    rectangles = list(col=adjustcolor("yellow", alpha.f=0.5), border="grey"),
+    text=list(lab="95% Prediction credible interval"))
+  
+  xyplot(X2.5.ile + X97.5.ile + Estimate + Units_sold ~ Temperature | Model,
+         data=modelData, as.table=TRUE, main="Ice cream model comparision",
+         xlab="Temperatures (C)", ylab="Units sold",
+         scales=list(alternating=1), key=key,
+         panel=function(x, y){
+           n <- length(x)
+           k <- n/2
+           upper <- y[(k/2+1):k]
+           lower <- y[1:(k/2)]
+           x <- x[1:(k/2)]
+           panel.polygon(c(x, rev(x)), c(upper, rev(lower)),
+                         col = adjustcolor("yellow", alpha.f = 0.5),
+                         border = "grey")
+           panel.lines(x, y[(k+1):(k+n/4)], col="blue")
+           panel.points(x, y[(n*3/4+1):n], lwd=2, col="#00526D")
+         }
+  )
+  
+  ## Need 97.5% percentile of posterior predictive MCMC samples.
+  A <- function(samples){
+  as.matrix(samples[,c("b_Intercept" ,"b_temp")])
+  }
+  x <- c(1, 35)
+  prob <- 0.975
+  #lin reg
+  lin.samples <- posterior_samples(lin.brm.mod)
+  summary(lin.samples)
+  n <- nrow(lin.samples)
+  mu <- A(lin.samples) %*% x
+  sigma <- lin.samples[,"sigma_units"]
+  lin_pred <- rnorm(n, mu, sigma);
+  (lin.q <- quantile( lin_pred, prob))
+  hist(lin_pred)
+  
+  #log-lin reg
+  log.lin.samples <- posterior_samples(log.brm.mod)
+  mu <- A(log.lin.samples) %*% x
+  sigma <- log.lin.samples[,"sigma_units"]
+  log.lin_pred <- exp(rnorm(n, mu + 0.5*sigma^2, sigma))
+  (log.lin.q <- quantile(log.lin_pred, prob))
+  hist(log.lin_pred)
+  
+  #poisson reg
+  pois.samples <- posterior_samples(pois.brm.mod)
+  mu <- exp(A(pois.samples) %*% x)
+  pois_pred <- rpois(n, mu)
+  (pois.q <- quantile(pois_pred , prob))
+  hist(pois_pred)
+  
+  #bin reg
+  bin.samples <- posterior_samples(bin.brm.mod)
+  mu <- (800 - exp(A(bin.samples) %*% x))/800
+  bin_pred <- rbinom(n,800, mu)
+  (bin.q <- quantile(bin_pred , prob))
+  hist(bin_pred)
+  
+  percentiles <- c(lin.q, log.lin.q, pois.q, bin.q)
+  b <- barplot(percentiles,
+               names.arg = c("Linear", "Log-transformed",
+                             "Poisson", "Binomial"),
+               ylab="Predicted ice cream units",
+               main="Predicted 97.5%ile at 35??C")
+  text(b, percentiles-75, round(percentiles))
